@@ -9,8 +9,17 @@ import flash.geom.Matrix;
 class ahz.scripts.widgets.AHZmoreHUDInventory extends MovieClip
 {
     //Widgets
-    public var iconHolder: TextField
+    public var iconHolder: TextField;
     public var itemCard: MovieClip;
+	
+	// For Active Effects Frame
+	public var SecsText:TextField;
+	public var ActiveEffectTimeValue:TextField;
+	
+	// For Powers Frame
+	public var MagicCostTimeLabel:TextField;
+	public var MagicCostTimeValue:TextField;
+	public var MagicCostPerSec:TextField;
 
     // Public vars
 
@@ -36,6 +45,7 @@ class ahz.scripts.widgets.AHZmoreHUDInventory extends MovieClip
     private static var hooksInstalled:Boolean = false;
     private static var AHZ_XMargin:Number 			= 15;
     private static var AHZ_YMargin:Number 			= 0;
+	private static var AHZ_YMargin_WithItems:Number = 35;
     private static var AHZ_FontScale:Number 		= 0.90;
 
     // Types from ItemCard
@@ -47,6 +57,7 @@ class ahz.scripts.widgets.AHZmoreHUDInventory extends MovieClip
     private static var BOOKFLAG_READ: Number        = 0x08; 
     private static var SHOW_PANEL                   = 1;
 
+	// For all non-magic menus
     private static var AHZ_ICF_WEAPONS_ENCH:Number 	= 10;
     private static var AHZ_ICF_ARMOR_ENCH:Number 	= 30;
     private static var AHZ_ICF_POTION:Number 		= 40;
@@ -54,10 +65,102 @@ class ahz.scripts.widgets.AHZmoreHUDInventory extends MovieClip
     private static var AHZ_ICF_INGR:Number 			= 50;
     private static var AHZ_ICF_BOOKS:Number 		= 80;
     private static var AHZ_ICF_MAGIC:Number 		= 90;
-
+	
+	// For magic menu
+	private static var AHZ_ICF_POWERS:Number 		= 95;
+	private static var AHZ_ICF_ACTIVEEFFECTS:Number = 171;
+	private static var AHZ_ICF_MM_MAGIC:Number = 100;
+	
+	// Anything above this frame does not get icons (For Now)
+	private static var AHZ_ICF_EMPTY:Number = 130;
 
     /* INITIALIZATION */
         
+	function getUnnamedInstances(target:MovieClip, getOnlyMovieClips:Boolean) :Array
+	{
+		var arr:Array = new Array();
+		for(var i in target)
+		{
+			
+			var proName = i.toString();
+			if (proName.indexOf("instance") == 0){
+				var unnamedIndex: String = proName.substring("instance".length);	
+				if (int(unnamedIndex))
+				{
+					if (getOnlyMovieClips){
+						if (target[i] instanceof MovieClip)
+						{
+							arr.push(target[i]);
+						}
+					}
+					else{
+						arr.push(target[i]);	
+					}
+				}
+			}
+		}	
+		return arr;
+	}
+
+	function GetBackgroundMovie():MovieClip
+	{
+		//_global.skse.plugins.AHZmoreHUDInventory.AHZLog("GetBackgroundMovie", false);	
+		if (itemCard["background"])
+		{
+			//_global.skse.plugins.AHZmoreHUDInventory.AHZLog(MovieClip(itemCard["background"]).toString(), false);	
+			return MovieClip(itemCard["background"]);
+		}
+		else
+		{
+			// Vanilla does not name the background
+			var arry:Array = getUnnamedInstances(itemCard, true);
+			if (arry && arry.length > 0)
+			{
+				var i:Number;
+				for (i = 0; i < arry.length; i++)
+				{
+					var children:Array = getUnnamedInstances(arry[i], false);
+					
+					// Skip movie clips that have unnamed children.  The background will not have any
+					if (children && children.length > 0)
+					{
+						// Skip
+					}
+					else
+					{
+						//_global.skse.plugins.AHZmoreHUDInventory.AHZLog(arry[i].toString(), false);
+						return MovieClip(arry[i]);
+					}
+				}				
+			}
+		}
+		//_global.skse.plugins.AHZmoreHUDInventory.AHZLog("undefined", false);
+		return undefined;
+	}		
+		
+	function GetItemsBelowDescription(targetMovie:MovieClip, targetTextField: TextField):Array
+	{
+		var arr:Array = new Array();
+		for(var i in targetMovie)
+		{
+			if (targetMovie[i] instanceof TextField)
+			{
+				if (TextField(targetMovie[i])._y > targetTextField._y)
+				{
+					arr.push(TextField(targetMovie[i]));
+				}
+			}
+			else if (targetMovie[i] instanceof MovieClip)
+			{
+				if (MovieClip(targetMovie[i])._y > targetTextField._y)
+				{
+					arr.push(MovieClip(targetMovie[i]));
+				}
+			}
+		}	
+		return arr;
+	}				
+		
     public function AHZmoreHUDInventory()
     {
         super();    
@@ -141,13 +244,13 @@ class ahz.scripts.widgets.AHZmoreHUDInventory extends MovieClip
 
         iconHolder.text = "";      
                 
-        _enableItemCardResize = isSkyui && _global.skse.plugins.AHZmoreHUDInventory.EnableItemCardResize();
-                
+        _enableItemCardResize = _global.skse.plugins.AHZmoreHUDInventory.EnableItemCardResize();
+
         if (_enableItemCardResize)
         {
             newWidth = this._width;
-            originalX = itemCard["background"]._x;  
-            originalWidth = itemCard["background"]._width;
+            originalX = GetBackgroundMovie()._x;  
+            originalWidth = GetBackgroundMovie()._width;
             newX = (originalX - (newWidth - originalWidth)) / 2;                
             itemCardWidth = itemCard._width;
                 
@@ -173,14 +276,14 @@ class ahz.scripts.widgets.AHZmoreHUDInventory extends MovieClip
             if (_itemCardOverride)
             {
                 this._alpha = 60;
-                itemCard["background"]._alpha = 0;                  
+                GetBackgroundMovie()._alpha = 0;     
             }
             else
             {
                 this._alpha = 0;
-				itemCard["background"]._alpha = 60;    
+				GetBackgroundMovie()._alpha = 60;    
             }           
-        }   
+        } 
     }
 
     function stringReplace(block:String, findStr:String, replaceStr:String):String
@@ -226,60 +329,131 @@ class ahz.scripts.widgets.AHZmoreHUDInventory extends MovieClip
         this._y = itemCardY;
         this._x = itemCardX - ((this._width - itemCardWidth) / 2);
         itemCardBottom = this._height;
-        
+        var oldDescrptionHeight:Number;
+		
         _global.skse.plugins.AHZmoreHUDInventory.AHZLog("<<<FRAME>>>: " + itemCardFrame, false);    
-        
-        switch (itemCardFrame)
-        {
-            case AHZ_ICF_WEAPONS_ENCH:
-            {
-                processedTextField = itemCard.WeaponEnchantedLabel;         
-            }
-            break;
-            case AHZ_ICF_ARMOR_ENCH:
-            {
-                processedTextField = itemCard.ApparelEnchantedLabel;
-            }
-            break;
-            case AHZ_ICF_POTION:
-            case AHZ_ICF_POTION_SURVIVAL:
-            {
-                processedTextField = itemCard.PotionsLabel;         
-            }
-            break;
-            case AHZ_ICF_BOOKS:
-            {
-                processedTextField = itemCard.BookDescriptionLabel;
-            }
-            break;          
-            case AHZ_ICF_MAGIC:
-            {
-                processedTextField = itemCard.MagicEffectsLabel;    
-            }
-            break;          
-            default:
-            {
-                processedTextField = undefined;
-				itemCard["background"]._alpha = 60;  
-                this._alpha = 0;
-            }
-            break;
-        }
-        
-        if (processedTextField)
-        {
-            _itemCardOverride = true;
-            this._alpha = 60;
-            itemCard["background"]._alpha = 0;  
-            processedTextField._width = this._width - (AHZ_XMargin * 2);
-            processedTextField._x = newX + AHZ_XMargin;
-            processedTextField._height = (itemCardBottom - processedTextField._y) - AHZ_YMargin;                
-            ShrinkToFit(processedTextField);    
-        }
-        else
-        {
-            _itemCardOverride = false;
-        }
+        	
+		if (_currentMenu == "MagicMenu")
+		{
+			switch (itemCardFrame)
+			{          
+				case AHZ_ICF_MM_MAGIC:
+				{
+					processedTextField = itemCard.MagicEffectsLabel;    
+				}
+				break;  
+				case AHZ_ICF_POWERS:
+				{
+					processedTextField = itemCard.MagicEffectsLabel;
+				}
+				break;
+				case AHZ_ICF_ACTIVEEFFECTS:
+				{
+					processedTextField = itemCard.MagicEffectsLabel;
+				}
+				break;			
+				default:
+				{
+					processedTextField = undefined;
+					GetBackgroundMovie()._alpha = 60;
+					this._alpha = 0;
+				}
+				break;
+			}
+			
+			if (processedTextField)
+			{
+				_itemCardOverride = true;
+				this._alpha = 60;
+				GetBackgroundMovie()._alpha = 0;
+				processedTextField._width = this._width - (AHZ_XMargin * 2);
+				processedTextField._x = newX + AHZ_XMargin;
+				oldDescrptionHeight = processedTextField._height;
+				processedTextField._height = (itemCardBottom - processedTextField._y) - (AHZ_YMargin_WithItems); 
+				ShrinkToFit(processedTextField);    
+			}
+			else
+			{
+				_itemCardOverride = false;
+			}		
+		}
+		else
+		{
+			// If we advance to somethine like the confirmation frame, then make sure the icons are wiped
+			if (itemCardFrame >= AHZ_ICF_EMPTY)
+			{
+				iconHolder._alpha = 0;
+			}
+			else
+			{
+				iconHolder._alpha = 100;
+			}
+			
+			switch (itemCardFrame)
+			{
+				case AHZ_ICF_WEAPONS_ENCH:
+				{
+					processedTextField = itemCard.WeaponEnchantedLabel;         
+				}
+				break;
+				case AHZ_ICF_ARMOR_ENCH:
+				{
+					processedTextField = itemCard.ApparelEnchantedLabel;
+				}
+				break;
+				case AHZ_ICF_POTION:
+				case AHZ_ICF_POTION_SURVIVAL:
+				{
+					processedTextField = itemCard.PotionsLabel;         
+				}
+				break;
+				case AHZ_ICF_BOOKS:
+				{
+					processedTextField = itemCard.BookDescriptionLabel;
+				}
+				break;          
+				case AHZ_ICF_MAGIC:
+				{
+					processedTextField = itemCard.MagicEffectsLabel;    
+				}
+				break;  		
+				default:
+				{
+					processedTextField = undefined;
+					GetBackgroundMovie()._alpha = 60;
+					this._alpha = 0;
+				}
+				break;
+			}
+			
+			if (processedTextField)
+			{
+				_itemCardOverride = true;
+				this._alpha = 60;
+				GetBackgroundMovie()._alpha = 0;
+				processedTextField._width = this._width - (AHZ_XMargin * 2);
+				processedTextField._x = newX + AHZ_XMargin;
+				oldDescrptionHeight = processedTextField._height;
+				processedTextField._height = (itemCardBottom - processedTextField._y) - AHZ_YMargin;
+				ShrinkToFit(processedTextField);    
+			}
+			else
+			{
+				_itemCardOverride = false;
+			}
+		}
+		
+		if (_itemCardOverride)
+		{
+			var itemsBelow:Array = GetItemsBelowDescription(itemCard, processedTextField);
+			
+			var itemBelow:Number;
+			
+			for (itemBelow = 0; itemBelow < itemsBelow.length; itemBelow++)
+			{
+				itemsBelow[itemBelow]._y = itemsBelow[itemBelow]._y + (processedTextField._height - oldDescrptionHeight);
+			}	
+		}
     }
 
     function appendImageToEnd(textField:TextField, imageName:String, width:Number, height:Number)
@@ -513,6 +687,18 @@ class ahz.scripts.widgets.AHZmoreHUDInventory extends MovieClip
         {
             AdjustItemCard(_lastFrame);
         }         
+
+		// No extended data to process for the magic menu
+		if (_currentMenu == "MagicMenu")
+		{
+			return;
+		}
+
+		// Keep icons off of frames like the confirmation frame etc.
+		if (itemCard._currentframe >= AHZ_ICF_EMPTY)
+		{
+			return;
+		}
 
         if (type != ICT_BOOK && type != ICT_ARMOR && type != ICT_WEAPON && type != ICT_POTION)
         {
