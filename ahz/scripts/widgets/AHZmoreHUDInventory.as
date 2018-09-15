@@ -1,6 +1,4 @@
-﻿import ahz.scripts.widgets.AHZDefines.AHZCCSkyUIFrames;
-import ahz.scripts.widgets.AHZDefines.AHZCCSurvFrames;
-import ahz.scripts.widgets.AHZDefines.AHZVanillaFrames;
+﻿import ahz.scripts.widgets.AHZDefines.AHZVanillaFrames;
 import flash.display.BitmapData;
 
 class ahz.scripts.widgets.AHZmoreHUDInventory extends MovieClip
